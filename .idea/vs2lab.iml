@@ -10,10 +10,7 @@
       <sourceFolder url="file://$MODULE_DIR$/Aufgabe1" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/lab4/chord" isTestSource="false" />
     </content>
-    <orderEntry type="jdk" jdkName="Pipenv (vs2lab)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.8 (vs2lab) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
-  </component>
-  <component name="TestRunnerService">
-    <option name="PROJECT_TEST_RUNNER" value="Unittests" />
   </component>
 </module>

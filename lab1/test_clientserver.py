@@ -1,7 +1,6 @@
 import logging
 import threading
 import unittest
-
 import clientserver
 from context import lab_logging
 
