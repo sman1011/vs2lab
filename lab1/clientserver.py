@@ -1,7 +1,8 @@
-import logging
 import socket
-
+import re
 import constCS
+import json
+import logging
 from context import lab_logging
 
 lab_logging.setup(stream_level=logging.INFO)  # init loging channels for the lab
@@ -10,6 +11,13 @@ lab_logging.setup(stream_level=logging.INFO)  # init loging channels for the lab
 class Server:
     _logger = logging.getLogger("vs2lab.lab1.clientserver.Server")
     _serving = True
+    dict1 = {
+        "A": "111111",
+        "B": "222222",
+        "C": "333333",
+        "D": "444444",
+        "E": "555555"
+    }
 
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -26,31 +34,67 @@ class Server:
                 while True:  # forever
                     data = connection.recv(1024)  # receive data from client
                     if not data:
-                        break  # stop if client stopped
-                    connection.send(data + "*".encode('ascii'))  # return sent data plus an "*"
-                connection.close()  # close the connection
+                            connection.send("keine data".encode('utf-8'))
+                            connection.close()  # close the connection
+                            break  # stop if client stopped
+                    elif data.decode('utf-8') in self.dict1:
+                        connection.send(data + ": ".encode('utf-8') + self.dict1[data.decode('utf-8')].encode('utf-8'))
+                    elif data.decode('utf-8') == 'getAll':
+                        msg = ""
+                        for i in self.dict1:
+                            msg = msg + i + ": " + self.dict1[i] + " "
+                        connection.send(msg.encode('utf-8'))
+                    elif data.decode('utf-8') == 'exit':
+                        connection.send(data)
+                        connection.close()  # close the connection
+                        break
+                    else:
+                        connection.send(data + ": keine Daten".encode('utf-8'))
             except socket.timeout:
                 pass  # ignore timeouts
-        self.sock.close()
-        self._logger.info("Server down.")
 
 
 class Client:
-    logger = logging.getLogger("vs2lab.a1_layers.clientserver.Client")
+    logger = logging.getLogger("vs2lab.a1_layers.client_1.Client")
 
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((constCS.HOST, constCS.PORT))
         self.logger.info("Client connected to socket " + str(self.sock))
 
-    def call(self, msg_in="Hello, world"):
-        self.sock.send(msg_in.encode('ascii'))  # send encoded string as data
-        data = self.sock.recv(1024)  # receive the response
-        msg_out = data.decode('ascii')
-        print(msg_out)  # print the result
-        self.sock.close()  # close the connection
-        self.logger.info("Client down.")
-        return msg_out
+    def call(self, request):
 
-    def close(self):
-        self.sock.close()
+            getRequest = re.search('get\s[a-zA-Z]+' or 'Get\s[a-zA-Z]+', request)
+            getAllRequest = re.search('getAll' or 'GetAll', request)
+            getExitRequest = re.search('exit', request)
+            if getRequest:
+                str1 = request[4:]
+                self.sock.send(str1.encode('utf-8'))  # send encoded string as data#
+                data = self.sock.recv(1024)  # receive the response
+                self.logger.info("GET REQUEST: " + data.decode('utf-8'))
+                self.sock.close()  # close the connection
+                return data.decode('utf-8')
+            elif getAllRequest:
+                self.sock.send(request.encode('utf-8'))  # send encoded string as data#
+                data = self.sock.recv(1024)  # receive the response
+                self.logger.info("GETALL REQUEST: " + data.decode('utf-8'))
+                self.sock.close()  # close the connection
+                return data.decode('utf-8')
+            elif getExitRequest:
+                self.sock.send('exit'.encode('utf-8'))  # send encoded string as data#
+                data = self.sock.recv(1024)  # receive the response
+                self.sock.close()  # close the connection
+                self.logger.info("EXIT: Client down.")
+                return data.decode('utf-8')
+            else:
+                if not request:
+                    self.sock.close()  # close the connection
+                    self.logger.info("NO DATA: Client down.")
+                    return "keine Eingabe"
+                else:
+                    self.sock.send(request.encode('utf-8'))
+                    data = self.sock.recv(1024)  # receive the response
+                    self.sock.close()  # close the connection
+                    self.logger.info("BAD DATA: Client down.")
+                    return data.decode('utf-8')
+

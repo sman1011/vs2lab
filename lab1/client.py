@@ -6,6 +6,7 @@ import json
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((constCS.HOST, constCS.PORT))  # connect to server (block until accepted)
+
 while True:
     request = input("Your request: ")
     getRequest = re.search('get\s[a-zA-Z]+' or 'Get\s[a-zA-Z]+', request)
@@ -21,7 +22,7 @@ while True:
         data = s.recv(1024)  # receive the response
         dataP = json.load(open("out.csv", "r"))
         for i in dataP:
-          print(str(i) + ": " + str(dataP[i]))  # print the result
+            print(str(i) + ": " + str(dataP[i]))  # print the result
     elif getExitRequest:
         s.send('exit'.encode('utf-8'))  # send encoded string as data#
         data = s.recv(1024)  # receive the response
