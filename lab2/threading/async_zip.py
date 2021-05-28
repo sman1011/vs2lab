@@ -20,6 +20,8 @@ class AsyncZip(threading.Thread):
 background = AsyncZip('mydata.txt', 'myarchive.zip')
 background.start()
 print('The main program continues to run in foreground.')
-
+for i in range(0, 10):
+    time.sleep(1)
+    print("-" + str(i) + "-")
 background.join()  # Wait for the background task to finish
 print('Main program waited until background was done.')

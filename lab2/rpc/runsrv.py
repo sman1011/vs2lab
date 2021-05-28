@@ -1,8 +1,10 @@
+import os
 import logging
 
 import rpc
 from context import lab_channel, lab_logging
 
+os.system('cls')
 lab_logging.setup(stream_level=logging.INFO)
 logger = logging.getLogger('vs2lab.lab2.rpc.runsrv')
 

@@ -6,7 +6,8 @@ class Server:
     def __init__(self):
         self.ci = lab_channel.Channel()
         self.server = self.ci.join('server')
-        self.timeout = 3
+        print("timeout")
+        self.timeout = 10
 
         # create instance logger
         self.logger = logging.getLogger('vs2lab.lab2.channel.Server')
@@ -15,6 +16,7 @@ class Server:
     def run(self):
         self.ci.bind(self.server)
         while True:
+            print("timeout!")
             message = self.ci.receive_from_any(self.timeout)
             if message is not None:
                 try:
