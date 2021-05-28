@@ -9,7 +9,6 @@ Simple implementation of a chord DHT (distributed hash table)
 """
 
 import logging
-
 import constChord
 
 
@@ -37,6 +36,8 @@ class ChordNode:
         self.node_list = []  # Nodes discovered so far
 
         self.logger = logging.getLogger("vs2lab.lab4.chordnode.ChordNode")
+
+        self.key = -1
 
     def in_between(self, key, lower_bound, upper_bound) -> bool:
         """
@@ -108,11 +109,14 @@ class ChordNode:
         elif self.in_between(key, self.node_id + 1, self.finger_table[1]):  # key in (self,FT[1]]
             return self.finger_table[1]  # successor responsible
         for i in range(1, self.n_bits):  # go through rest of FT
-            if self.in_between(key, self.finger_table[i], self.finger_table[(i + 1) ]):
+            if self.in_between(key, self.finger_table[i], self.finger_table[(i + 1)]):
                 return self.finger_table[i]  # key in [FT[i],FT[i+1])
-        if self.in_between(key, self.finger_table[-1], self.finger_table[0] + 1): # key outside FT
-            return self.finger_table[-1]  # key in [FT[-1],FT[0]]
-        assert False # we cannot be here
+        if self.in_between(key, self.finger_table[-1], self.finger_table[0] + 1):  # key outside FT
+            if self.node_id < self.finger(0):
+                return self.finger_table[1]  # key in [FT[-1],FT[0]]
+            else:
+                return self.finger_table[0]  # key in [FT[-1],FT[0]]
+        assert False  # we cannot be here
 
     def enter(self):
         self.channel.bind(str(self.node_id))  # bind current pid
@@ -128,7 +132,6 @@ class ChordNode:
             # make this node known to all others
             self.channel.send_to([other_node], constChord.JOIN)
         self.recompute_finger_table()  # initialize local finger table
-
         self.logger.info("ChordNode {:04n} ready.".format(self.node_id))
 
     def run(self):
@@ -136,7 +139,6 @@ class ChordNode:
             message = self.channel.receive_from_any()  # Wait for any request
             sender: str = message[0]  # Identify the sender
             request = message[1]  # And the actual request
-
             # If sender is a node (that stays in the ring) then update known nodes
             if request[0] != constChord.LEAVE and self.channel.channel.sismember('node', sender):
                 self.add_node(sender)  # remember sender node
@@ -149,15 +151,15 @@ class ChordNode:
             if request[0] == constChord.LOOKUP_REQ:  # A lookup request
                 self.logger.info("Node {:04n} received LOOKUP {:04n} from {:04n}."
                                  .format(self.node_id, int(request[1]), int(sender)))
-
-                # look up and return local successor 
+                # look up and return local successor
                 next_id: int = self.local_successor_node(request[1])
-                self.channel.send_to([sender], (constChord.LOOKUP_REP, next_id))
-
-                # Finally do a sanity check
-                if not self.channel.exists(next_id):  # probe for existence
-                    self.delete_node(next_id)  # purge disappeared node
-
+                if next_id == self.node_id:
+                    self.channel.send_to({i.decode() for i in list(self.channel.channel.smembers('client'))},
+                                         constChord.LOOKUP_REP)
+                    break
+                self.channel.send_to({i.decode() for i in list(self.channel.channel.smembers('node'))
+                                      if i.decode() == str(next_id)}, (constChord.LOOKUP_REQ, request[1]))
+                continue
             elif request[0] == constChord.JOIN:
                 # Join request (the node was already registered above)
                 self.logger.debug("Node {:04n} received JOIN from {:04n}."
@@ -170,8 +172,6 @@ class ChordNode:
                 self.delete_node(sender)  # update known nodes
 
             self.recompute_finger_table()  # adjust finger-table based on updated node set
-
-        # print finger table status before termination
         print("FT[{:04n}]: {}"
               .format(self.node_id, ["{:04n}"
                       .format(finger_node) for finger_node in self.finger_table]))

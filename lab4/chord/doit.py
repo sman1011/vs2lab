@@ -10,7 +10,8 @@ Chord Application
 import logging
 import sys
 import multiprocessing as mp
-
+import random
+import time
 import chordnode as chord_node
 import constChord
 from context import lab_channel, lab_logging
@@ -24,12 +25,32 @@ class DummyChordClient:
     def __init__(self, channel):
         self.channel = channel
         self.node_id = channel.join('client')
+        self.key = random.randint(0, pow(2, constChord.N_BITS) - 1)
+        self.node_list = []
+        self.random_node = -1
 
     def enter(self):
         self.channel.bind(self.node_id)
 
     def run(self):
-        print("Implement me pls...")
+        print("Client - id: " + self.node_id)
+        print("Key: {}".format(self.key))
+        for i in list(self.channel.channel.smembers('node')):
+            self.node_list.append(i.decode())
+        random_list = random.sample(self.node_list, k=1)
+        self.random_node = random_list[0]
+        print("Random-Node: {}".format(self.random_node))
+        self.channel.send_to({j.decode() for j in list(self.channel.channel.smembers('node'))
+                              if j.decode() == self.random_node}, (constChord.LOOKUP_REQ, self.key))
+        message = self.channel.receive_from_any()
+        sender: str = message[0]  # Identify the sender
+        reply: str = message[1]
+        if reply[0] == constChord.LOOKUP_REP:
+            print("------------------------")
+            print("GESUCHTER KNOTEN: {}".format(sender))
+            print("------------------------")
+            self.node_list.sort(reverse=False)
+            print("Node-List: {}".format(self.node_list))
         self.channel.send_to(  # a final multicast
             {i.decode() for i in list(self.channel.channel.smembers('node'))},
             constChord.STOP)
@@ -80,7 +101,6 @@ if __name__ == "__main__":  # if script is started from command line
             args=(m, chord_node.ChordNode, bar1, bar2))
         children.append(nodeproc)
         nodeproc.start()
-
     # spawn client proc and wait for it to finish
     clientproc = mp.Process(
         target=create_and_run,

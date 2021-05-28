@@ -2,7 +2,7 @@ import logging
 import random
 import time
 
-from constMutex import ENTER, RELEASE, ALLOW
+from constMutex import ENTER, RELEASE, ALLOW, PING
 
 
 class Process:
@@ -40,6 +40,9 @@ class Process:
         self.queue = []  # The request queue list
         self.clock = 0  # The current logical clock
         self.logger = logging.getLogger("vs2lab.lab5.mutex.process.Process")
+        self.working_processes: list = []
+        self.crashed_processes: list = []
+        self.counter = 0
 
     def __mapid(self, id='-1'):
         # resolve channel member address to a human friendly identifier
@@ -91,7 +94,8 @@ class Process:
 
     def __receive(self):
          # Pick up any message
-        _receive = self.channel.receive_from(self.other_processes, 10) 
+        _receive = self.channel.receive_from(self.other_processes, 10)
+
         if _receive:
             msg = _receive[1]
 
@@ -102,7 +106,8 @@ class Process:
                 self.__mapid(),
                 "ENTER" if msg[2] == ENTER
                 else "ALLOW" if msg[2] == ALLOW
-                else "RELEASE", self.__mapid(msg[1])))
+                else "RELEASE" if msg[2] == RELEASE
+                else "PING", self.__mapid(msg[1])))
 
             if msg[2] == ENTER:
                 self.queue.append(msg)  # Append an ENTER request
@@ -114,10 +119,33 @@ class Process:
                 # assure release requester indeed has access (his ENTER is first in queue)
                 assert self.queue[0][1] == msg[1] and self.queue[0][2] == ENTER, 'State error: inconsistent remote RELEASE'
                 del (self.queue[0])  # Just remove first message
+            elif msg[2] == PING:
+                if self.process_id not in self.working_processes:
+                    self.working_processes.append(self.process_id)
+                if msg[1] not in self.working_processes:
+                    self.working_processes.append(msg[1])
 
             self.__cleanup_queue()  # Finally sort and cleanup the queue
-        else:        
+        else:
+            self.counter = self.counter + 1
             self.logger.warning("{} timed out on RECEIVE.".format(self.__mapid()))
+            if self.counter == 1:
+                msg = (self.clock, self.process_id, PING)
+                self.channel.send_to(self.other_processes, msg)
+            if self.counter > 1:
+                for item in self.channel.subgroup('proc'):
+                    if item not in self.working_processes:
+                        self.crashed_processes.append(item)
+                        print("CRASHED-PROCESS: {} -> {}".format(item, self.__mapid(item)))
+                for i in self.crashed_processes:
+                    if i in self.all_processes:
+                        self.all_processes.remove(i)
+                    if i in self.other_processes:
+                        self.other_processes.remove(i)
+                for item in self.queue:
+                    if item[1] in self.crashed_processes:
+                        self.queue.remove(item)
+                self.counter = 0
 
     def init(self):
         self.channel.bind(self.process_id)
@@ -149,11 +177,11 @@ class Process:
                 sleep_time = random.randint(0, 2000)
                 self.logger.debug("{} enters CS for {} milliseconds."
                     .format(self.__mapid(), sleep_time))
-                print(" CS <- {}".format(self.__mapid()))
+                print(" CS <- {} -- ID: {}".format(self.__mapid(), self.process_id))
                 time.sleep(sleep_time/1000)
 
                 # ... then leave CS
-                print(" CS -> {}".format(self.__mapid()))
+                print(" CS -> {} -- ID: {}".format(self.__mapid(), self.process_id))
                 self.__release()
                 continue
 

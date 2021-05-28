@@ -7,7 +7,7 @@ address2 = "tcp://" + constRR.HOST + ":" + constRR.PORT2  # how and where to con
 
 context = zmq.Context()
 reply_socket = context.socket(zmq.REP)  # create reply socket
- 
+
 reply_socket.bind(address1)  # bind socket to address
 reply_socket.bind(address2)  # bind socket to address
 
